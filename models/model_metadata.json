@@ -1,0 +1,15 @@
+{
+  "model_version": "1.0",
+  "model_type": "CalibratedClassifierCV(LogisticRegression)",
+  "scikit_learn_version": "1.7.1",
+  "training_dataset": "EMSCAD Real or Fake Job Posting Prediction",
+  "feature_count": 20204,
+  "feature_groups": [
+    "TF-IDF text",
+    "categorical job fields",
+    "binary posting fields",
+    "text length and salary features"
+  ],
+  "training_timestamp": null,
+  "notes": "Training timestamp and evaluation metrics were not recorded in the existing artifact."
+}

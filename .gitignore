@@ -1,0 +1,27 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.pyc
+.pytest_cache/
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data & models (large files, do not commit)
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+models/*.pkl
+models/*.joblib
+
+# OS / IDE
+.DS_Store
+.vscode/
+*.log
+
