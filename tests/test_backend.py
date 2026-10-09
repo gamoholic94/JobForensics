@@ -13,7 +13,7 @@ from src.preprocessing import clean_text, preprocess_dataframe, make_inference_f
 from src.risk_engine import aggregate_risk, content_rules
 from src.scraper import extract_job_fields, fetch_html, scrape_job
 from src.reddit_scraper import scrape_reddit
-from src.public_reviews import search_public_reviews
+from src.public_reviews import analyze_submitted_review
 from src.url_analyzer import analyze_url, normalize_url
 from src.salary_analyzer import analyze_salary
 from src.explain import explain_with_lime, explain_with_shap
@@ -205,28 +205,14 @@ def test_reddit_scraper_rejects_non_reddit_urls():
         scrape_reddit("https://example.com/jobs/1")
 
 
-def test_public_review_search_labels_suspicious_payment_language():
-    payload = {"data": {"children": [{"data": {
-        "id": "review-1",
-        "title": "Warning about Acme",
-        "selftext": "They asked me to pay upfront through Telegram.",
-        "subreddit_name_prefixed": "r/jobs",
-        "permalink": "/r/jobs/comments/review-1/warning/",
-        "author": "reviewer",
-        "score": 4,
-    }}]}}
-    with patch("src.public_reviews._bounded_json_get", return_value=payload):
-        result = search_public_reviews("Acme")
-    assert result["reviews"][0]["status"] == "Suspicious"
-    assert result["reviews"][0]["source"] == "Reddit"
-
-
-def test_public_review_search_explains_blocked_reddit_search():
-    response = MagicMock(status_code=403)
-    error = requests.HTTPError("blocked", response=response)
-    with patch("src.public_reviews._bounded_json_get", side_effect=error):
-        with pytest.raises(ValueError, match="public search is unavailable"):
-            search_public_reviews("Wipro")
+def test_submitted_review_labels_suspicious_payment_language():
+    result = analyze_submitted_review(
+        "Google",
+        "https://www.google.com/maps",
+        "They asked me to pay upfront through Telegram.",
+    )
+    assert result["status"] == "Suspicious"
+    assert result["source"] == "Google"
 
 
 # ============================================================================

@@ -22,7 +22,7 @@ from src.model import MODEL_PATH, load_model
 from src.predict import analyze_posting
 from src.scraper import fetch_html, scrape_job
 from src.reddit_scraper import scrape_reddit
-from src.public_reviews import search_public_reviews
+from src.public_reviews import analyze_submitted_review
 from src.investigations import get_investigation, investigation_flag_counts, investigation_report, list_investigations, save_investigation
 
 app = FastAPI(title="JobForensics Prediction API")
@@ -93,11 +93,17 @@ def investigation_stats() -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.get("/public-reviews")
-def public_reviews(company: str, limit: int = 10) -> dict[str, Any]:
+class ReviewEvidenceRequest(BaseModel):
+    source: str
+    url: str = ""
+    text: str
+
+
+@app.post("/public-reviews")
+def public_reviews(request: ReviewEvidenceRequest) -> dict[str, Any]:
     try:
-        return search_public_reviews(company, limit)
-    except (OSError, ValueError, json.JSONDecodeError, requests.RequestException) as exc:
+        return analyze_submitted_review(request.source, request.url, request.text)
+    except (OSError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 

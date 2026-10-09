@@ -141,11 +141,11 @@ platform and subreddit in the result. It does not access private communities,
 authenticate, bypass rate limits, or treat Reddit discussion as authoritative
 company verification.
 
-The dashboard also provides a public Reddit review search through
-`GET /public-reviews?company=...`. Review labels are heuristic signals
-(`Likely authentic`, `Suspicious`, or `Uncertain`) with source links and
-explanations; they are not definitive proof that a review is real or fake.
-LinkedIn is not scraped without an approved API or data provider.
+The dashboard accepts user-supplied review text and optional links from
+Google, Glassdoor, Indeed, Trustpilot, LinkedIn, or other platforms through
+`POST /public-reviews`. No review platform is scraped or logged into. Review
+labels are heuristic signals (`Likely authentic`, `Suspicious`, or
+`Uncertain`) and are not definitive proof that a review is real or fake.
 
 For deployment, commit the generated `models/model.pkl` artifact, deploy the
 Render service, then set `BACKEND_API_URL` in the Vercel project to the full

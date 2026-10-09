@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 
-export async function GET(request: Request) {
+export async function POST(request: Request) {
   const backendUrl = process.env.BACKEND_API_URL?.trim();
   if (!backendUrl) return NextResponse.json({ error: "Prediction service is not configured." }, { status: 503 });
-  const query = new URL(request.url).search;
   try {
-    const response = await fetch(`${backendUrl.replace(/\/$/, "")}/public-reviews${query}`, {
+    const response = await fetch(`${backendUrl.replace(/\/$/, "")}/public-reviews`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(await request.json()),
       signal: AbortSignal.timeout(30_000),
       cache: "no-store",
     });

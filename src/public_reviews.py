@@ -1,12 +1,7 @@
-"""Bounded public review lookup using Reddit's public JSON search endpoint."""
+"""Analyze review evidence supplied by the user without scraping review sites."""
 
 from datetime import datetime, timezone
 from typing import Any
-from urllib.parse import quote_plus
-
-import requests
-
-from src.reddit_scraper import MAX_RESPONSE_BYTES, REDDIT_HEADERS, TIMEOUT_SECONDS, _bounded_json_get
 
 
 def _review_status(text: str, score: int, author: str) -> tuple[str, str]:
@@ -19,50 +14,24 @@ def _review_status(text: str, score: int, author: str) -> tuple[str, str]:
     return "Uncertain", "Public metadata is insufficient to verify authenticity."
 
 
-def search_public_reviews(company: str, limit: int = 10) -> dict[str, Any]:
-    company = company.strip()
-    if len(company) < 2:
-        raise ValueError("Enter a company name to search public reviews.")
-    limit = max(1, min(int(limit), 20))
-    url = (
-        "https://www.reddit.com/search.json?q="
-        f"{quote_plus(company + ' job review')}&type=link&sort=relevance&limit={limit}"
-    )
-    try:
-        payload = _bounded_json_get(url, timeout=TIMEOUT_SECONDS)
-    except requests.HTTPError as exc:
-        if exc.response is not None and exc.response.status_code in {401, 403, 429}:
-            raise ValueError(
-                "Reddit public search is unavailable from this deployment. "
-                "You can still analyze a specific public Reddit post URL."
-            ) from exc
-        raise
-    children = payload.get("data", {}).get("children", []) if isinstance(payload, dict) else []
-    reviews: list[dict[str, Any]] = []
-    for child in children[:limit]:
-        data = child.get("data", {}) if isinstance(child, dict) else {}
-        title = str(data.get("title") or "").strip()
-        body = str(data.get("selftext") or "").strip()
-        text = "\n\n".join(part for part in (title, body) if part)
-        if not text:
-            continue
-        score = int(data.get("score") or 0)
-        author = str(data.get("author") or "")
-        status, explanation = _review_status(text, score, author)
-        permalink = str(data.get("permalink") or "")
-        reviews.append({
-            "id": str(data.get("id") or permalink),
-            "title": title or "Public Reddit discussion",
-            "text": body or title,
-            "source": "Reddit",
-            "subreddit": str(data.get("subreddit_name_prefixed") or ""),
-            "author": author or "deleted",
-            "score": score,
-            "url": f"https://www.reddit.com{permalink}" if permalink.startswith("/") else "",
-            "status": status,
-            "status_explanation": explanation,
-            "published_at": datetime.fromtimestamp(float(data["created_utc"]), timezone.utc).isoformat()
-            if data.get("created_utc")
-            else "",
-        })
-    return {"company": company, "reviews": reviews, "source": "Reddit public search"}
+def analyze_submitted_review(source: str, url: str, text: str) -> dict[str, Any]:
+    source = source.strip()
+    url = url.strip()
+    text = text.strip()
+    if not source:
+        raise ValueError("Select the review platform.")
+    if len(text) < 20:
+        raise ValueError("Paste at least 20 characters of review text.")
+    if url and not url.startswith(("http://", "https://")):
+        raise ValueError("The review link must start with http:// or https://.")
+    status, explanation = _review_status(text, 0, "")
+    return {
+        "id": f"submitted-{datetime.now(timezone.utc).timestamp()}",
+        "title": f"Submitted {source} review",
+        "text": text,
+        "source": source,
+        "url": url,
+        "status": status,
+        "status_explanation": explanation + " Source identity and authorship were not independently verified.",
+        "analyzed_at": datetime.now(timezone.utc).isoformat(),
+    }
