@@ -11,6 +11,7 @@ from functools import lru_cache
 from typing import Any
 from urllib.parse import urlparse
 
+import requests
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,6 +22,7 @@ from src.model import MODEL_PATH, load_model
 from src.predict import analyze_posting
 from src.scraper import fetch_html, scrape_job
 from src.reddit_scraper import scrape_reddit
+from src.public_reviews import search_public_reviews
 from src.investigations import get_investigation, investigation_flag_counts, investigation_report, list_investigations, save_investigation
 
 app = FastAPI(title="JobForensics Prediction API")
@@ -88,6 +90,14 @@ def investigation_stats() -> dict[str, Any]:
     try:
         return {"red_flags": investigation_flag_counts()}
     except (OSError, sqlite3.Error, ValueError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/public-reviews")
+def public_reviews(company: str, limit: int = 10) -> dict[str, Any]:
+    try:
+        return search_public_reviews(company, limit)
+    except (OSError, ValueError, json.JSONDecodeError, requests.RequestException) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 

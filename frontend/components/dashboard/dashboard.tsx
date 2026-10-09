@@ -9,6 +9,7 @@ import { TrendChart } from "./trend-chart";
 import { JobDistribution } from "./job-distribution";
 import { RecentPredictions } from "./recent-predictions";
 import { RedFlags } from "./red-flags";
+import { CompanyReviews } from "./company-reviews";
 import Link from "next/link";
 import { getInvestigationStats, listInvestigations, SavedInvestigation } from "@/lib/api";
 
@@ -108,6 +109,8 @@ export function Dashboard() {
         <RecentPredictions investigations={investigations} />
         <RedFlags flags={redFlags} />
       </div>
+
+      <CompanyReviews />
 
       <Card className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">

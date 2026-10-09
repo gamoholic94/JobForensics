@@ -141,6 +141,12 @@ platform and subreddit in the result. It does not access private communities,
 authenticate, bypass rate limits, or treat Reddit discussion as authoritative
 company verification.
 
+The dashboard also provides a public Reddit review search through
+`GET /public-reviews?company=...`. Review labels are heuristic signals
+(`Likely authentic`, `Suspicious`, or `Uncertain`) with source links and
+explanations; they are not definitive proof that a review is real or fake.
+LinkedIn is not scraped without an approved API or data provider.
+
 For deployment, commit the generated `models/model.pkl` artifact, deploy the
 Render service, then set `BACKEND_API_URL` in the Vercel project to the full
 Render service URL (for example, `https://your-service.onrender.com`). Redeploy
