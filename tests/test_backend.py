@@ -221,6 +221,14 @@ def test_public_review_search_labels_suspicious_payment_language():
     assert result["reviews"][0]["source"] == "Reddit"
 
 
+def test_public_review_search_explains_blocked_reddit_search():
+    response = MagicMock(status_code=403)
+    error = requests.HTTPError("blocked", response=response)
+    with patch("src.public_reviews._bounded_json_get", side_effect=error):
+        with pytest.raises(ValueError, match="public search is unavailable"):
+            search_public_reviews("Wipro")
+
+
 # ============================================================================
 # PHASE 3: ANALYZER TESTS
 # ============================================================================

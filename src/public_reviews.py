@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import quote_plus
 
+import requests
+
 from src.reddit_scraper import MAX_RESPONSE_BYTES, REDDIT_HEADERS, TIMEOUT_SECONDS, _bounded_json_get
 
 
@@ -26,7 +28,15 @@ def search_public_reviews(company: str, limit: int = 10) -> dict[str, Any]:
         "https://www.reddit.com/search.json?q="
         f"{quote_plus(company + ' job review')}&type=link&sort=relevance&limit={limit}"
     )
-    payload = _bounded_json_get(url, timeout=TIMEOUT_SECONDS)
+    try:
+        payload = _bounded_json_get(url, timeout=TIMEOUT_SECONDS)
+    except requests.HTTPError as exc:
+        if exc.response is not None and exc.response.status_code in {401, 403, 429}:
+            raise ValueError(
+                "Reddit public search is unavailable from this deployment. "
+                "You can still analyze a specific public Reddit post URL."
+            ) from exc
+        raise
     children = payload.get("data", {}).get("children", []) if isinstance(payload, dict) else []
     reviews: list[dict[str, Any]] = []
     for child in children[:limit]:
