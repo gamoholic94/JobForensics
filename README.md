@@ -106,7 +106,7 @@ are claimed until that file is available.
 
 ### 2. Launch the Python prediction API
 
-The production frontend is the Next.js app in `jobguard-frontend-boilerplate`.
+The production frontend is the Next.js app in the `frontend` directory.
 Vercel hosts that frontend, while this Python API hosts the model and analysis
 pipeline. The model artifact is required at `models/model.pkl`.
 
@@ -114,9 +114,38 @@ pipeline. The model artifact is required at `models/model.pkl`.
 uvicorn api_server:app --reload --port 8000
 ```
 
-The API exposes `GET /health` and `POST /predict`. The frontend forwards its
-same-origin `/api/predict` route to this service using the server-only
+The API exposes `GET /health`, `POST /predict`, and investigation persistence
+endpoints: `POST /investigations`, `GET /investigations`, and
+`GET /investigations/{id}`. The frontend forwards its same-origin
+`/api/predict` and `/api/investigations` routes to this service using the server-only
 `BACKEND_API_URL` environment variable.
+
+Saved investigations also expose `GET /investigations/{id}/report`, which
+downloads a self-contained HTML investigation report containing source
+metadata, classification, risk signals, triggered indicators, and
+recommendations. PDF export is not enabled yet, so no PDF dependency or
+conversion is implied.
+
+Investigations are stored in a local SQLite database at
+`data/jobforensics.sqlite3` by default. Set `JOBFORENSICS_DATABASE_PATH` to
+choose another location in deployment. The current persistence layer stores
+complete analysis results and is intentionally shared and unauthenticated.
+The dashboard's Common Red Flags panel uses `GET /investigations/stats` to
+show the most frequent indicators in saved investigations and stays empty
+until evidence exists.
+
+Reddit post URLs are supported as a public-source input. The service uses
+Reddit's public JSON representation, analyzes the post plus at most 20 public
+comments, limits the response size, disables redirects, and records the source
+platform and subreddit in the result. It does not access private communities,
+authenticate, bypass rate limits, or treat Reddit discussion as authoritative
+company verification.
+
+For deployment, commit the generated `models/model.pkl` artifact, deploy the
+Render service, then set `BACKEND_API_URL` in the Vercel project to the full
+Render service URL (for example, `https://your-service.onrender.com`). Redeploy
+the frontend after changing the variable. Set `ALLOWED_ORIGINS` on Render to
+the Vercel origin if the API is also called directly from a browser.
 
 The backend returns a **model fake probability**, not a calibrated confidence
 claim. A separate overall risk score combines documented starting weights for

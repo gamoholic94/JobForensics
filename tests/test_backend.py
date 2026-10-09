@@ -1,4 +1,5 @@
 """Comprehensive test suite for Fake Job Detection backend."""
+import json
 import pytest
 import pandas as pd
 import requests
@@ -11,6 +12,7 @@ from src.predict import analyze_posting
 from src.preprocessing import clean_text, preprocess_dataframe, make_inference_frame
 from src.risk_engine import aggregate_risk, content_rules
 from src.scraper import extract_job_fields, fetch_html, scrape_job
+from src.reddit_scraper import scrape_reddit
 from src.url_analyzer import analyze_url, normalize_url
 from src.salary_analyzer import analyze_salary
 from src.explain import explain_with_lime, explain_with_shap
@@ -168,6 +170,38 @@ def test_scraper_revalidates_redirect_destination():
     assert result["success"] is False
     assert "private or local" in result["error"].lower()
     assert get.call_count == 1
+
+
+def test_reddit_scraper_extracts_post_and_bounded_comments():
+    payload = [
+        {"data": {"children": [{"data": {
+            "title": "Is this job a scam?",
+            "selftext": "They ask for a registration fee.",
+            "subreddit": "jobs",
+            "permalink": "/r/jobs/comments/abc/example/",
+        }}]}},
+        {"data": {"children": [
+            {"data": {"body": "Do not pay them."}},
+            {"data": {"body": "Report the listing."}},
+        ]}},
+    ]
+    response = MagicMock()
+    response.status_code = 200
+    response.headers = {"content-type": "application/json", "content-length": "100"}
+    response.encoding = "utf-8"
+    response.iter_content.return_value = [json.dumps(payload).encode()]
+    response.raise_for_status = MagicMock()
+    with patch("src.reddit_scraper.requests.get", return_value=response):
+        result = scrape_reddit("https://www.reddit.com/r/jobs/comments/abc/example/")
+    assert result["success"] is True
+    assert result["source_platform"] == "Reddit"
+    assert result["comment_count_analyzed"] == 2
+    assert "registration fee" in result["description"]
+
+
+def test_reddit_scraper_rejects_non_reddit_urls():
+    with pytest.raises(ValueError, match="Reddit"):
+        scrape_reddit("https://example.com/jobs/1")
 
 
 # ============================================================================

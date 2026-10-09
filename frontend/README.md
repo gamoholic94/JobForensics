@@ -59,7 +59,7 @@ The response is the unified result from the Python pipeline.
 
 1. Deploy the Python service from the repository root with `uvicorn api_server:app --host 0.0.0.0 --port $PORT`.
 2. Make sure the Python service has `models/model.pkl`; run `python -m src.model` first if needed.
-3. Import `jobguard-frontend-boilerplate` into Vercel as the Root Directory.
+3. Import this repository into Vercel and set `frontend` as the Root Directory.
 4. Set `BACKEND_API_URL` to the deployed Python service URL in Vercel Environment Variables.
 5. Deploy the Next.js app.
 

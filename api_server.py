@@ -3,13 +3,16 @@
 import base64
 import binascii
 import csv
+import json
 import os
+import sqlite3
 from io import BytesIO
 from functools import lru_cache
 from typing import Any
 from urllib.parse import urlparse
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from bs4 import BeautifulSoup
 from pydantic import BaseModel
@@ -17,6 +20,8 @@ from pydantic import BaseModel
 from src.model import MODEL_PATH, load_model
 from src.predict import analyze_posting
 from src.scraper import fetch_html, scrape_job
+from src.reddit_scraper import scrape_reddit
+from src.investigations import get_investigation, investigation_flag_counts, investigation_report, list_investigations, save_investigation
 
 app = FastAPI(title="JobForensics Prediction API")
 
@@ -48,6 +53,10 @@ class BatchPredictionRequest(BaseModel):
     file_content_base64: str = ""
 
 
+class InvestigationRequest(BaseModel):
+    result: dict[str, Any]
+
+
 @lru_cache(maxsize=1)
 def get_model():
     return load_model(MODEL_PATH)
@@ -56,6 +65,55 @@ def get_model():
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.post("/investigations")
+def create_investigation(request: InvestigationRequest) -> dict[str, Any]:
+    try:
+        return save_investigation(request.result)
+    except (OSError, sqlite3.Error, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/investigations")
+def investigations(limit: int = 50) -> dict[str, Any]:
+    try:
+        return {"investigations": list_investigations(limit)}
+    except (OSError, sqlite3.Error, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/investigations/stats")
+def investigation_stats() -> dict[str, Any]:
+    try:
+        return {"red_flags": investigation_flag_counts()}
+    except (OSError, sqlite3.Error, ValueError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/investigations/{investigation_id}")
+def investigation(investigation_id: str) -> dict[str, Any]:
+    try:
+        stored = get_investigation(investigation_id)
+    except (OSError, sqlite3.Error, ValueError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if stored is None:
+        raise HTTPException(status_code=404, detail="Investigation not found.")
+    return stored
+
+
+@app.get("/investigations/{investigation_id}/report", response_class=HTMLResponse)
+def investigation_report_endpoint(investigation_id: str) -> HTMLResponse:
+    try:
+        report = investigation_report(investigation_id)
+    except (OSError, sqlite3.Error, ValueError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if report is None:
+        raise HTTPException(status_code=404, detail="Investigation not found.")
+    return HTMLResponse(
+        report,
+        headers={"Content-Disposition": f'attachment; filename="jobforensics-{investigation_id}.html"'},
+    )
 
 
 def extract_uploaded_text(request: PredictionRequest) -> str:
@@ -94,6 +152,11 @@ def is_linkedin_url(url: str) -> bool:
     return hostname == "linkedin.com" or hostname.endswith(".linkedin.com")
 
 
+def is_reddit_url(url: str) -> bool:
+    hostname = (urlparse(url).hostname or "").lower().rstrip(".")
+    return hostname in {"reddit.com", "www.reddit.com", "old.reddit.com"}
+
+
 def scrape_google_form(url: str) -> str:
     html = fetch_html(url)
     soup = BeautifulSoup(html, "html.parser")
@@ -117,6 +180,10 @@ def predict_one(request: PredictionRequest) -> dict[str, Any]:
         try:
             if is_google_form(request.url):
                 text = scrape_google_form(request.url)
+            elif is_reddit_url(request.url):
+                scraped = scrape_reddit(request.url)
+                text = scraped["description"]
+                job.update(scraped)
             else:
                 scraped = scrape_job(request.url)
                 if not scraped.get("success"):
@@ -136,7 +203,8 @@ def predict_one(request: PredictionRequest) -> dict[str, Any]:
         except HTTPException:
             raise
         except Exception as exc:
-            raise HTTPException(status_code=422, detail="Unable to read the Google Forms link.") from exc
+            source_name = "Reddit" if is_reddit_url(request.url) else "the job posting URL"
+            raise HTTPException(status_code=422, detail=f"Unable to read {source_name}.") from exc
 
     if not text.strip():
         raise HTTPException(status_code=400, detail="A job description or readable URL is required.")

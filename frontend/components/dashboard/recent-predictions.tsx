@@ -2,16 +2,9 @@ import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { SavedInvestigation } from "@/lib/api";
 
-const rows = [
-  ["Software Engineer", "TechNova Solutions", "legitimate", "96%"],
-  ["Data Analyst", "Bright Minds Ltd", "fraudulent", "92%"],
-  ["Marketing Executive", "Global Reach", "legitimate", "89%"],
-  ["WFH Typist", "Quick Earners", "fraudulent", "94%"],
-  ["Financial Advisor", "WealthGrow Inc", "legitimate", "87%"],
-];
-
-export function RecentPredictions() {
+export function RecentPredictions({ investigations }: { investigations: SavedInvestigation[] }) {
   return (
     <Card className="overflow-hidden">
       <div className="flex items-center justify-between p-5">
@@ -24,14 +17,18 @@ export function RecentPredictions() {
             <tr>{["Job Title", "Company", "Prediction", "Confidence"].map(h => <th key={h} className="px-5 py-3 font-semibold">{h}</th>)}</tr>
           </thead>
           <tbody>
-            {rows.map(([title, company, verdict, confidence]) => (
-              <tr key={title} className="border-t border-[var(--border)]">
-                <td className="px-5 py-3.5 font-medium">{title}</td>
-                <td className="px-5 py-3.5 text-[var(--muted)]">{company}</td>
-                <td className="px-5 py-3.5"><Badge tone={verdict === "fraudulent" ? "danger" : "success"}>{verdict}</Badge></td>
-                <td className="px-5 py-3.5 font-semibold">{confidence}</td>
+            {investigations.slice(0, 5).map((item) => {
+              const verdict = item.classification === "Likely Fake" ? "fraudulent" : item.classification === "Likely Legitimate" ? "legitimate" : "verification";
+              const tone = verdict === "fraudulent" ? "danger" : verdict === "legitimate" ? "success" : "warning";
+              return (
+              <tr key={item.id} className="border-t border-[var(--border)]">
+                <td className="px-5 py-3.5 font-medium"><Link href={`/investigations/${item.id}`} className="hover:text-[#315fce]">{item.title || "Job posting"}</Link></td>
+                <td className="px-5 py-3.5 text-[var(--muted)]">{item.company || "Unavailable"}</td>
+                <td className="px-5 py-3.5"><Badge tone={tone}>{verdict}</Badge></td>
+                <td className="px-5 py-3.5 font-semibold">{item.overall_risk_score == null ? "Unavailable" : `${Math.round(item.overall_risk_score)}/100`}</td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

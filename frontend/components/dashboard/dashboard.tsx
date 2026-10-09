@@ -1,5 +1,6 @@
  "use client";
 
+ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { AlertTriangle, BriefcaseBusiness, Building2, CheckCircle2, ArrowUpRight, ShieldCheck } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -9,15 +10,54 @@ import { JobDistribution } from "./job-distribution";
 import { RecentPredictions } from "./recent-predictions";
 import { RedFlags } from "./red-flags";
 import Link from "next/link";
-
-const stats = [
-  { label: "Total Job Postings", value: "12,486", meta: "+12%", note: "Analyzed so far", icon: BriefcaseBusiness, tone: "blue" },
-  { label: "Legitimate Jobs", value: "9,842", meta: "78.9%", note: "Likely genuine opportunities", icon: CheckCircle2, tone: "green" },
-  { label: "Fraudulent Jobs", value: "2,644", meta: "21.1%", note: "Potential scams detected", icon: AlertTriangle, tone: "red" },
-  { label: "Companies", value: "1,327", meta: "+8%", note: "Unique companies analyzed", icon: Building2, tone: "purple" },
-];
+import { getInvestigationStats, listInvestigations, SavedInvestigation } from "@/lib/api";
 
 export function Dashboard() {
+  const [investigations, setInvestigations] = useState<SavedInvestigation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [redFlags, setRedFlags] = useState<Array<{ name: string; percentage: number }>>([]);
+
+  useEffect(() => {
+    Promise.all([listInvestigations(), getInvestigationStats()])
+      .then(([items, stats]) => {
+        setInvestigations(items);
+        setRedFlags(stats.red_flags);
+      })
+      .catch((requestError) => setError(requestError instanceof Error ? requestError.message : "Could not load dashboard data."))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const stats = useMemo(() => {
+    const legitimate = investigations.filter((item) => item.classification === "Likely Legitimate").length;
+    const fraudulent = investigations.filter((item) => item.classification === "Likely Fake").length;
+    const companies = new Set(investigations.map((item) => item.company).filter(Boolean)).size;
+    return [
+      { label: "Saved Investigations", value: investigations.length, meta: "", note: "Persisted analysis records", icon: BriefcaseBusiness, tone: "blue" },
+      { label: "Likely Legitimate", value: legitimate, meta: investigations.length ? `${Math.round((legitimate / investigations.length) * 100)}%` : "", note: "Current saved records", icon: CheckCircle2, tone: "green" },
+      { label: "Likely Fraudulent", value: fraudulent, meta: investigations.length ? `${Math.round((fraudulent / investigations.length) * 100)}%` : "", note: "Potential scams detected", icon: AlertTriangle, tone: "red" },
+      { label: "Companies", value: companies, meta: "", note: "Unique saved companies", icon: Building2, tone: "purple" },
+    ];
+  }, [investigations]);
+
+  const trendData = useMemo(() => {
+    const grouped = new Map<string, { legit: number; fraud: number }>();
+    for (const item of investigations) {
+      const day = new Date(item.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      const entry = grouped.get(day) || { legit: 0, fraud: 0 };
+      if (item.classification === "Likely Fake") entry.fraud += 1;
+      else if (item.classification === "Likely Legitimate") entry.legit += 1;
+      grouped.set(day, entry);
+    }
+    return Array.from(grouped, ([day, values]) => ({ day, ...values })).reverse();
+  }, [investigations]);
+
+  const distribution = [
+    { name: "Likely Legitimate", value: stats[1].value, color: "#12b76a" },
+    { name: "Likely Fraudulent", value: stats[2].value, color: "#f04438" },
+    { name: "Needs Review", value: investigations.filter((item) => item.classification === "Needs Review").length, color: "#f79009" },
+  ];
+
   return (
     <div className="space-y-7">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -31,6 +71,8 @@ export function Dashboard() {
         </Link>
       </div>
 
+      {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
+      {loading && <p className="text-sm text-[var(--muted)]">Loading saved investigations...</p>}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((s, i) => {
           const Icon = s.icon;
@@ -48,7 +90,7 @@ export function Dashboard() {
                   </div>
                   <span className={`text-xs font-bold ${s.tone === "red" ? "text-red-600" : "text-emerald-600"}`}>{s.meta}</span>
                 </div>
-                <div className="mt-5 text-2xl font-bold">{s.value}</div>
+                <div className="mt-5 text-2xl font-bold">{loading ? "..." : s.value}</div>
                 <div className="mt-1 text-sm font-medium">{s.label}</div>
                 <div className="mt-1 text-xs text-[var(--muted)]">{s.note}</div>
               </Card>
@@ -58,13 +100,13 @@ export function Dashboard() {
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1.55fr_1fr]">
-        <TrendChart />
-        <JobDistribution />
+        <TrendChart data={trendData} />
+        <JobDistribution data={distribution} />
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1.55fr_1fr]">
-        <RecentPredictions />
-        <RedFlags />
+        <RecentPredictions investigations={investigations} />
+        <RedFlags flags={redFlags} />
       </div>
 
       <Card className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">

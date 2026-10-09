@@ -107,7 +107,7 @@ export function JobScanner() {
         <div className="p-6 lg:p-8">
           {mode === "url" && (
             <div>
-              <label className="text-sm font-semibold">Job posting or Google Forms URL</label>
+              <label className="text-sm font-semibold">Job posting, Reddit, or Google Forms URL</label>
               <div className="mt-2 flex flex-col gap-3 sm:flex-row">
                 <div className="flex flex-1 items-center gap-2 rounded-xl border border-[var(--border)] px-3">
                   <Link2 size={18} className="text-[var(--muted)]" />
@@ -115,7 +115,7 @@ export function JobScanner() {
                 </div>
                 <Button onClick={submit} disabled={!url || loading}>{loading ? <Loader2 className="animate-spin" size={17} /> : null} Analyze Job</Button>
               </div>
-              <p className="mt-2 text-xs text-[var(--muted)]">Job portals that block automated access return a limited result. Paste the description for a fuller analysis.</p>
+              <p className="mt-2 text-xs text-[var(--muted)]">Public Reddit posts are analyzed with bounded post/comment text. Job portals that block automated access return a limited result.</p>
             </div>
           )}
 

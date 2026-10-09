@@ -20,6 +20,11 @@ export type Prediction = {
     company: string;
     location: string;
     employment_type: string;
+    source_url?: string;
+    scraped_at?: string;
+    source_platform?: string;
+    subreddit?: string;
+    comment_count_analyzed?: number;
   };
   domain_analysis: Record<string, unknown>;
   company_analysis: Record<string, unknown>;
@@ -43,6 +48,59 @@ export type BatchPrediction = {
   failed: number;
   results: BatchPredictionItem[];
 };
+
+export type SavedInvestigation = {
+  id: string;
+  created_at: string;
+  source_url: string;
+  title: string;
+  company: string;
+  classification: string;
+  overall_risk_score: number | null;
+};
+
+export type InvestigationStats = {
+  red_flags: Array<{ name: string; count: number; percentage: number }>;
+};
+
+export async function saveInvestigation(result: Prediction): Promise<SavedInvestigation> {
+  const response = await fetch("/api/investigations", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ result }),
+  });
+  const body = await response.json();
+  if (!response.ok) {
+    throw new Error(body.detail || body.error || `Could not save investigation: ${response.status}`);
+  }
+  return body as SavedInvestigation;
+}
+
+export async function listInvestigations(limit = 50): Promise<SavedInvestigation[]> {
+  const response = await fetch(`/api/investigations?limit=${limit}`, { cache: "no-store" });
+  const body = await response.json();
+  if (!response.ok) {
+    throw new Error(body.detail || body.error || `Could not load investigations: ${response.status}`);
+  }
+
+  return body.investigations as SavedInvestigation[];
+}
+
+export async function getInvestigationStats(): Promise<InvestigationStats> {
+  const response = await fetch("/api/investigations/stats", { cache: "no-store" });
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.detail || body.error || `Could not load investigation stats: ${response.status}`);
+  return body as InvestigationStats;
+}
+
+export async function getInvestigation(id: string): Promise<{ id: string; created_at: string; result: Prediction }> {
+  const response = await fetch(`/api/investigations/${encodeURIComponent(id)}`, { cache: "no-store" });
+  const body = await response.json();
+  if (!response.ok) {
+    throw new Error(body.detail || body.error || `Could not load investigation: ${response.status}`);
+  }
+  return body as { id: string; created_at: string; result: Prediction };
+}
 
 export async function analyzeJob(payload: Record<string, unknown>): Promise<Prediction> {
   const response = await fetch("/api/predict", {

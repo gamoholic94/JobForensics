@@ -12,16 +12,14 @@ env/
 # Jupyter
 .ipynb_checkpoints/
 
-# Data & models (large files, do not commit)
+# Training data is local, but the persisted model is a required deployment artifact.
 data/raw/*
 !data/raw/.gitkeep
 data/processed/*
 !data/processed/.gitkeep
-models/*.pkl
-models/*.joblib
+data/*.sqlite3
 
 # OS / IDE
 .DS_Store
 .vscode/
 *.log
-

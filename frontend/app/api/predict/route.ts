@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 
-const backendUrl = process.env.BACKEND_API_URL;
-
 export async function POST(request: Request) {
+  const backendUrl = process.env.BACKEND_API_URL?.trim();
   if (!backendUrl) {
     return NextResponse.json(
-      { error: "Prediction service is not configured." },
+      { error: "Prediction service is not configured. Set BACKEND_API_URL in the frontend deployment." },
       { status: 503 },
     );
   }
@@ -22,7 +21,7 @@ export async function POST(request: Request) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(25_000),
+      signal: AbortSignal.timeout(120_000),
       cache: "no-store",
     });
 

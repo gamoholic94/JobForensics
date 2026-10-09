@@ -5,20 +5,18 @@ import Link from "next/link";
 import { AlertTriangle, CheckCircle2, ShieldAlert, ExternalLink, ArrowLeft } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Prediction, saveInvestigation } from "@/lib/api";
 
-export function AnalysisResult() {
-  const [result, setResult] = useState<{
-    prediction: "legitimate" | "fraudulent" | "verification";
-    probability: number;
-    confidence: number;
-    reasons?: string[];
-    job?: { title?: string; company?: string };
-  } | null>(null);
+export function AnalysisResult({ initialResult, readOnly = false }: { initialResult?: Prediction; readOnly?: boolean }) {
+  const [result, setResult] = useState<Prediction | null>(initialResult || null);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   useEffect(() => {
+    if (initialResult) return;
     const raw = sessionStorage.getItem("jobforensics-result");
     if (raw) setResult(JSON.parse(raw));
-  }, []);
+  }, [initialResult]);
 
   if (!result) {
     return <div className="mx-auto max-w-4xl py-12 text-center text-[var(--muted)]">No analysis is available. Start with a job posting.</div>;
@@ -32,6 +30,25 @@ export function AnalysisResult() {
     : isLegit
       ? "This job appears legitimate"
       : "This job cannot be confirmed yet";
+  const componentScores = result.risk?.component_scores || {};
+  const riskSignals = [
+    ["Model signal", "ml"],
+    ["Domain signal", "domain"],
+    ["Company information", "company"],
+    ["Salary claim", "salary"],
+    ["Application process", "application"],
+    ["Job description", "content"],
+  ] as const;
+  async function saveCurrentInvestigation() {
+    if (!result || saveState === "saving" || saveState === "saved") return;
+    setSaveState("saving");
+    try {
+      await saveInvestigation(result);
+      setSaveState("saved");
+    } catch {
+      setSaveState("error");
+    }
+  }
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -47,7 +64,17 @@ export function AnalysisResult() {
               <h1 className="mt-4 text-3xl font-bold">{verdict}</h1>
               <p className="mt-2 text-lg font-semibold">{result.job?.title || "Job posting"}</p>
               <p className="mt-1 text-[var(--muted)]">{result.job?.company || "Company unavailable"}</p>
-              <a href="#" className="mt-3 inline-flex items-center gap-1 text-sm text-[#315fce]">Job posting <ExternalLink size={14} /></a>
+              {result.job?.source_url && (
+                <a href={result.job.source_url} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1 text-sm text-[#315fce]">
+                  Job posting <ExternalLink size={14} />
+                </a>
+              )}
+              {!readOnly && <div className="mt-4 flex items-center gap-3">
+                <Button onClick={saveCurrentInvestigation} disabled={saveState === "saving" || saveState === "saved"}>
+                  {saveState === "saved" ? "Investigation saved" : saveState === "saving" ? "Saving..." : "Save investigation"}
+                </Button>
+                {saveState === "error" && <span className="text-sm text-red-600" role="alert">Could not save this investigation.</span>}
+              </div>}
             </div>
             <div className="text-center">
               <div className={`mx-auto grid size-36 place-items-center rounded-full border-[12px] ${isFraud ? "border-red-200 text-red-600" : isLegit ? "border-emerald-200 text-emerald-600" : "border-amber-200 text-amber-600"}`}>
@@ -77,17 +104,16 @@ export function AnalysisResult() {
           <h2 className="text-lg font-bold">Risk Assessment</h2>
           <p className="mt-1 text-sm text-[var(--muted)]">Signal strength from the available job information.</p>
           <div className="mt-6 space-y-5">
-            {[
-              ["Salary claim", "High", 88],
-              ["Company information", "High", 82],
-              ["Job description", "Medium", 58],
-              ["Application process", "High", 84],
-            ].map(([label, level, value]) => (
-              <div key={label}>
-                <div className="mb-2 flex justify-between text-sm"><span>{label}</span><span className="font-semibold">{level}</span></div>
-                <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-800"><div className="h-full rounded-full bg-red-500" style={{ width: `${value}%` }} /></div>
-              </div>
-            ))}
+            {riskSignals.map(([label, key]) => {
+              const value = Math.round(Math.max(0, Math.min(100, Number(componentScores[key] || 0))));
+              const level = value >= 70 ? "High" : value >= 40 ? "Medium" : "Low";
+              return (
+                <div key={label}>
+                  <div className="mb-2 flex justify-between text-sm"><span>{label}</span><span className="font-semibold">{level}</span></div>
+                  <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-800"><div className="h-full rounded-full bg-red-500" style={{ width: `${value}%` }} /></div>
+                </div>
+              );
+            })}
           </div>
         </Card>
       </div>

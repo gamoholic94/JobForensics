@@ -6,6 +6,7 @@ import json
 import logging
 import ipaddress
 import socket
+from datetime import datetime, timezone
 from typing import Any
 
 import requests
@@ -199,6 +200,7 @@ def scrape_job(url: str, timeout: int = 10) -> dict[str, Any]:
         html = fetch_html(normalized, timeout=timeout)
         result = extract_job_fields(html)
         result["url"] = normalized
+        result["scraped_at"] = datetime.now(timezone.utc).isoformat()
         result["success"] = bool(result["description"])
         result["error"] = None if result["description"] else "No readable job content found"
         result["error_type"] = None if result["description"] else "EmptyContentError"
